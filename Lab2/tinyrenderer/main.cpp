@@ -80,7 +80,6 @@ void draw_3d_model_simple(ModelPtrArray const& models, TGAImage &frame, float *z
     }
 	
 	pool->WaitForTasks();
-	//std::cout << "END OF FRAME\n";
 }
 
 int main(int argc, char* args[]) {
