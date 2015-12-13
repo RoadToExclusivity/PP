@@ -15,7 +15,6 @@ semaphore = threading.Semaphore()
 isLock = False
 isEvent = False
 isSemaphore = False
-set_event = -1
 
 rest_lines_count = []
 
@@ -37,44 +36,25 @@ def print_letters(letter):
 
 
 def start_synchronize(thread_number):
-    global set_event
     if isLock:
         lock.acquire()
     elif isEvent:
-        event_lock.acquire()
-
-        # for i in range(thread_count):
-        #     events[i].wait()
-        if set_event == -1:
-            set_event = thread_number
-            events[set_event].wait()
-        else:
-            events[set_event].wait()
-            set_event = thread_number
-            events[set_event].wait()
-
-        event_lock.release()
+        events[thread_number].wait()
     elif isSemaphore:
         semaphore.acquire()
 
 
-def stop_synchronize(thread_number):
-    global set_event
+def stop_synchronize(thread_number, thread_count):
     if isLock:
         lock.release()
     elif isEvent:
-        event_lock.acquire()
-
-        prev_event = set_event
-        set_event = -1
-        events[prev_event].set()
-
-        event_lock.release()
+        events[thread_number].clear()
+        events[(thread_number + 1) % thread_count].set()
     elif isSemaphore:
         semaphore.release()
 
 
-def thread_loop(thread_number):
+def thread_loop(thread_number, thread_count):
     global rest_lines_count
     was_print = True
     while was_print:
@@ -92,7 +72,7 @@ def thread_loop(thread_number):
             if need_print:
                 print_letters(chr(ord('a') + i))
 
-            stop_synchronize(thread_number)
+            stop_synchronize(thread_number, thread_count)
 
 
 def launch_threads(thread_count):
@@ -100,13 +80,13 @@ def launch_threads(thread_count):
         rest_lines_count.append(LINES_PER_LETTER)
 
     if isEvent:
-        for i in range(thread_count):
+        for i in range(thread_count + 1):
             events.append(threading.Event())
-            events[i].set()
+        events[0].set()
 
     threads = []
     for i in range(thread_count):
-        threads.append(threading.Thread(target=thread_loop, args=(i,)))
+        threads.append(threading.Thread(target=thread_loop, args=(i, thread_count,)))
         threads[i].start()
 
     for i in range(thread_count):
