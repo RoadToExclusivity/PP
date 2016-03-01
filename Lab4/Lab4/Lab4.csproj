@@ -41,6 +41,10 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Fork.cs" />
+    <Compile Include="Helper.cs" />
+    <Compile Include="Lunch.cs" />
+    <Compile Include="Philosopher.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
