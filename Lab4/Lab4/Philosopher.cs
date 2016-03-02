@@ -11,6 +11,7 @@
         private int _thinkCount;
 
         private Fork[] _forks;
+        private bool[] _ownForks;
         private int _allForksCount;
         private int _curForksCount;
 
@@ -23,12 +24,23 @@
             _thinkCount = 0;
             _allForksCount = _forks.Length;
             _curForksCount = 0;
+
+            _ownForks = new bool[_allForksCount];
+            for (int i = 0; i < _allForksCount; ++i)
+            {
+                _ownForks[i] = false;
+            }
         }
 
         private void Eat()
         {
             _isHungry = false;
             _eatCount++;
+
+            for (int i = 0; i < _allForksCount; ++i)
+            {
+                _forks[i].SetForPut();
+            }
         }
 
         private void Think()
@@ -37,26 +49,114 @@
             _thinkCount++;
         }
 
-
-        private void TakeFork(int forkRelativePosition)
+        private void LogTakeFork(int forkPosition)
         {
-            if (forkRelativePosition == 0)
+            string msg = "Философ " + (_pos + 1).ToString();
+            if (forkPosition == 0)
             {
-                _lunch.SetLeftFork(_pos);
-                _state = State.LEFT_FORK;
-                Logger.Log("Философ " + (_pos + 1).ToString() + " берет левую вилку");
+                msg = msg + " берет левую вилку";
             }
             else
             {
-                _lunch.SetRightFork(_pos);
-                _state = State.RIGHT_FORK;
-                Logger.Log("Философ " + (_pos + 1).ToString() + " берет правую вилку");
+                msg = msg + " берет правую вилку";
             }
+            Logger.Log(msg);
         }
 
-        public bool IsHungry()
+        private void LogPutFork(int forkPosition)
         {
-            return _isHungry;
+            string msg = "Философ " + (_pos + 1).ToString();
+            if (forkPosition == 0)
+            {
+                msg = msg + " кладет левую вилку";
+            }
+            else
+            {
+                msg = msg + " кладет правую вилку";
+            }
+            Logger.Log(msg);
+        }
+
+        private bool CanTakeFork(int priorFork)
+        {
+            _forks[priorFork].Lock();
+            if (_forks[priorFork].IsTaken())
+            {
+                _forks[priorFork].Release();
+                return false;
+            }
+
+            if (_curForksCount == _allForksCount - 1)
+            {
+                return true;
+            }
+
+            for (int i = 0; i < _allForksCount; ++i)
+            {
+                if (i != priorFork)
+                {
+                    _forks[i].Lock();
+                }
+            }
+
+            bool res = true;
+            for (int i = 0; i < _allForksCount && res; ++i)
+            {
+                if (i != priorFork)
+                {
+                    res = res && (!_forks[i].IsTaken() || (!_ownForks[i] && _forks[i].IsForPut()));
+                }
+            }
+
+            for (int i = 0; i < _allForksCount; ++i)
+            {
+                if (i != priorFork) //обязательно будет забрана вилка priorFork
+                {
+                    _forks[i].Release();
+                }
+            }
+
+            if (!res)
+            {
+                _forks[priorFork].Release();
+            }
+
+            return res;
+        }
+
+        private bool TakeRowForks()
+        {
+            bool hasTaken = false;
+            for (int i = 0; i < _allForksCount && !hasTaken; ++i)
+            {
+                if (CanTakeFork(i))
+                {
+                    LogTakeFork(i);
+                    TakeFork(i);
+                    hasTaken = true;
+                }
+            }
+
+            if (!hasTaken)
+            {
+                Logger.Log("Философ " + (_pos + 1).ToString() + " хочет взять вилку, но не может, т.к. может возникнуть ситуация голода");
+            }
+
+            return hasTaken;
+        }
+
+        private void TakeFork(int forkRelativePosition)
+        {
+            _forks[forkRelativePosition].Take();
+            _curForksCount++;
+            _ownForks[forkRelativePosition] = true;
+        }
+
+        private void PutDownFork(int forkRelativePosition)
+        {
+            _forks[forkRelativePosition].PutDown();
+            _curForksCount--;
+            _ownForks[forkRelativePosition] = false;
         }
 
         public void Activate()
@@ -69,13 +169,15 @@
                     {
                         int rndFork = ForkRandom.GetRandomFork(_allForksCount);
 
-                        if (_lunch.CanTakeBothForks(_pos, rndFork))
+                        if (CanTakeFork(rndFork))
                         {
+                            LogTakeFork(rndFork);
                             TakeFork(rndFork);
                         }
                         else
                         {
-                            Logger.Log("Философ " + (_pos + 1).ToString() + " хочет взять вилку, но не может, т.к. в ближайшее время ее не отпустят");
+                            TakeRowForks();
+                            //Logger.Log("Философ " + (_pos + 1).ToString() + " хочет взять вилку, но не может, т.к. может возникнуть ситуация голода");
                         }
                     }
                     else
@@ -87,102 +189,55 @@
                         }
                         else
                         {
-
+                            if (TakeRowForks())
+                            {
+                                if (_curForksCount == _allForksCount)
+                                {
+                                    Logger.Log("Философ " + (_pos + 1).ToString() + " готовится обедать");
+                                }
+                            }
                         }
-                    }
-                    switch (_state)
-                    {
-                        case State.LEFT_FORK:
-                            {
-                                if (_lunch.CheckRightFork(_pos))
-                                {
-                                    _lunch.SetRightFork(_pos);
-                                    _state = State.BOTH_FORKS;
-                                    Logger.Log("Философ " + (_pos + 1).ToString() + " берет правую вилку и готовится обедать");
-                                }
-                                break;
-                            }
-                        case State.RIGHT_FORK:
-                            {
-                                if (_lunch.CheckLeftFork(_pos))
-                                {
-                                    _lunch.SetLeftFork(_pos);
-                                    _state = State.BOTH_FORKS;
-                                    Logger.Log("Философ " + (_pos + 1).ToString() + " берет левую вилку и готовится обедать");
-                                }
-                                break;
-                            }
-                        case State.BOTH_FORKS:
-                            {
-                                Eat();
-                                Logger.Log("Философ " + (_pos + 1).ToString() + " обедает");
-                                break;
-                            }
-                        case State.NO_FORKS:
-                            {
-                                int rndFork = ForkRandom.GetRandomFork();
-
-                                if (_lunch.CanTakeBothForks(_pos, rndFork))
-                                {
-                                    TakeFork(rndFork);
-                                }
-                                else
-                                {
-                                    Logger.Log("Философ " + (_pos + 1).ToString() + " хочет взять вилку, но не может, т.к. в ближайшее время ее не отпустят");
-                                }
-                                break;
-                            }
-                        default:
-                            break;
                     }
                 }
                 else
                 {
-                    switch (_state)
+                    if (_curForksCount == 0)
                     {
-                        case State.LEFT_FORK:
+                        Think();
+                        Logger.Log("Философ " + (_pos + 1).ToString() + " размышляет");
+                    }
+                    else
+                    {
+                        if (_curForksCount == _allForksCount)
+                        {
+                            int rndFork = ForkRandom.GetRandomFork(_allForksCount);
+
+                            PutDownFork(rndFork);
+                            LogPutFork(rndFork);
+                        }
+                        else
+                        {
+                            int rndFork = ForkRandom.GetRandomFork(_curForksCount);
+                            int counter = -1;
+
+                            for (int i = 0; i < _allForksCount && counter != rndFork; ++i)
                             {
-
-                                _lunch.PutDownLeftFork(_pos);
-                                _state = State.NO_FORKS;
-                                Logger.Log("Философ " + (_pos + 1).ToString() + " кладет левую вилку, готовится размышлять");
-
-                                break;
-                            }
-                        case State.RIGHT_FORK:
-                            {
-                                _lunch.PutDownRightFork(_pos);
-                                _state = State.NO_FORKS;
-                                Logger.Log("Философ " + (_pos + 1).ToString() + " кладет правую вилку, готовится размышлять");
-
-                                break;
-                            }
-                        case State.BOTH_FORKS:
-                            {
-                                int rndFork = ForkRandom.GetRandomFork();
-
-                                if (rndFork == 0)
+                                if (_ownForks[i])
                                 {
-                                    _lunch.PutDownLeftFork(_pos);
-                                    _state = State.RIGHT_FORK;
-                                    Logger.Log("Философ " + (_pos + 1).ToString() + " кладет левую вилку");
+                                    counter++;
+                                    if (counter == rndFork)
+                                    {
+                                        PutDownFork(i);
+                                        LogPutFork(i);
+                                    }
                                 }
-                                else
-                                {
-                                    _lunch.PutDownRightFork(_pos);
-                                    _state = State.LEFT_FORK;
-                                    Logger.Log("Философ " + (_pos + 1).ToString() + " кладет правую вилку");
-                                }
-                                break;
                             }
-                        case State.NO_FORKS:
+
+                            if (_curForksCount == 0)
                             {
-                                Think();
-                                Logger.Log("Философ " + (_pos + 1).ToString() + " размышляет");
-                                break;
+                                Logger.Log("Философ " + (_pos + 1).ToString() + " готовится размышлять");
                             }
-                        default:
-                            break;
+                        }
                     }
                 }
             }

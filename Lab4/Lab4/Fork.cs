@@ -7,17 +7,19 @@ namespace Lab4
         private Semaphore _forkLock;
         private bool _isTaken;
         private bool _isForEat;
+        private int _index;
 
-        public Fork()
+        public Fork(int index)
         {
+            _index = index;
             _forkLock = new Semaphore(1, 1);
             _isTaken = false;
-            _isForEat = false;
+            _isForEat = true;
         }
 
-        public void Take()
+        public void Take() //already locked
         {
-            _forkLock.WaitOne();
+            //_forkLock.WaitOne();
             _isTaken = true;
             _isForEat = true;
             _forkLock.Release();
@@ -45,7 +47,17 @@ namespace Lab4
 
         public bool IsForPut()
         {
-            return _isForEat;
+            return !_isForEat;
+        }
+
+        public void Lock()
+        {
+            _forkLock.WaitOne();
+        }
+
+        public void Release()
+        {
+            _forkLock.Release();
         }
     }
 }
