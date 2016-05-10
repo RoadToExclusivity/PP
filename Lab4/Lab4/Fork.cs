@@ -17,9 +17,8 @@ namespace Lab4
             _isForEat = true;
         }
 
-        public void Take() //already locked
+        public void Take()
         {
-            //_forkLock.WaitOne();
             _isTaken = true;
             _isForEat = true;
             _forkLock.Release();
